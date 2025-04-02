@@ -1,36 +1,35 @@
-# Use the official Python image from Docker Hub
-FROM python:3.11-slim
+# Stage 1: Build the application
+FROM python:3.11-slim AS build
 
-# Install PostgreSQL development libraries for psycopg2
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-
-# Set the working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt /app/
-
-# Install the required Python packages from requirements.txt
+# Install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the Django app code into the container
-COPY ./app/. /app/
+# Stage 2: Prepare the runtime image
+FROM python:3.11-slim AS runtime
 
-# Set environment variables for Django
-ENV SECRET_KEY='your-secret-key'
-ENV DEBUG='False'
-ENV DATABASE_NAME='django_db'
-ENV DATABASE_USER='django_user'
-ENV DATABASE_PASSWORD='django_password'
-ENV DATABASE_HOST='postgres-service'
-ENV DATABASE_PORT='5432'
+# Set environment variables
+ENV PYTHONUNBUFFERED 1
+ENV SECRET_KEY=your-secret-key
+ENV DEBUG=False
+ENV DATABASE_NAME=your-db-name
+ENV DATABASE_USER=your-db-user
+ENV DATABASE_PASSWORD=your-db-password
+ENV DATABASE_HOST=your-db-host
+ENV DATABASE_PORT=5432
+
+# Set working directory
+WORKDIR /app
+
+# Copy the application files from the build stage
+COPY --from=build /app /app
 
 # Expose the port the app will run on
 EXPOSE 8080
 
-# Run
+# Run database migrations as an entrypoint before starting the app
+ENTRYPOINT ["sh", "-c", "python manage.py migrate && gunicorn --bind 0.0.0.0:8080 --access-logfile - app.wsgi:application"]
+
